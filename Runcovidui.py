@@ -3,6 +3,7 @@
 #Author:Chanapai Chuadchum
 #Project:Auracore color controller GUI 
 #release date:25/2/2020
+from pyzbar import pyzbar 
 import getpass 
 import cv2  # Opencv for the camera qr code tracking and the covid 19 detection data 
 import qrcode 
@@ -19,12 +20,14 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import pyqtgraph.opengl as gl
-import pandas as pd
-import csv 
+import pandas as pd # Reading the pandas data from the csv data of the patient 
+import csv #reading the csv file data 
+import re
 import os 
 import sys
 import serial # Serial protocol for connecting to the pheripheral devices like microcontroller 
 import time
+import subprocess # subprocess for running the command inside the linux system 
 config_Data = {"Top_catesian":{'x':200,'y':200},"Bottom_catesian":{'x':200,'y':200}} #Configuretion data in json for the stepper motor control step co-ordination
 #Setting the current position in array 
 #Top cam catsian robot 
@@ -53,6 +56,50 @@ listPATH_drive = os.listdir(PATHDIR) #Getting the data inside the list of the pa
 
 dirmem_ext = [] #Getting the external drive list data  
 external_file = [] #Getting the external file in the directory
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+ # Camera devices get index 
+cameradevmem = [] #getting the camera mem data inside the list of the function 
+cam_index = [] #Getting the camera device index data 
+Getcam = []
+Index_cam =[] #Getting the index camera mem inside the list
+cam_num = [] # Getting the camera number 
+Qr_listdata = [] #Getting the qr code list data function
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Camera , SerialUSB , pheripheral device detect must running in the multitasking programming to automaticly detect the devices 
+# List the camera webcam available connected with the computer 
+try:
+  listcamera = subprocess.check_output("v4l2-ctl --list-devices",shell=True)
+  print("Camera devices listing")
+  print(listcamera.decode()) #decode the list the camera device
+  camlist = listcamera.decode().split("/dev/")
+  for re in range(0,len(camlist)):
+          print(camlist[re])
+          cameradevmem.append(camlist[re])
+  print(cameradevmem,len(cameradevmem))
+  for indexcam in range(0,len(cameradevmem)-1):
+              cam_index.append(cameradevmem[indexcam]) #Getting the index unsorted value 
+  print(cam_index)
+  #Getting the video camera with modulo technique 
+  for qs in range(0,len(cam_index)):
+            modulo = qs%2  #Getting the modulo calculate inside the data 
+            if modulo == 1:
+                Getcam.append(cam_index[qs]) #Getting the camera devices 
+  print(Getcam[0])
+  for w in range(0,len(Getcam)):
+         print(str(Getcam[w])) #Getting the camera video list devices 
+         Index_cam.append(str(Getcam[w]))
+  print("Index camera: ",Index_cam)
+  for wr in range(0,len(Index_cam)):
+          print(list(Index_cam[wr]))
+          listcamdat = list(Index_cam[wr])
+          print(listcamdat[len(listcamdat)-3]) 
+          indexcamdat = listcamdat[len(listcamdat)-3]
+          cam_num.append(indexcamdat) 
+  print("Camera list available ID: ",cam_num)
+except: 
+    print("No such camera device found!")
+
+print(Index_cam) #Show the index cam list to using inside the 
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, *args, **kwargs):
@@ -293,9 +340,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def Serialfunc(self,text): #Getting the text from the list file of the serial 
               print("serial_selected",text)
               try:
-                pnp_serial = printcore('/dev/'+str(text),115200) #fixed baudrate  using the serial communication to control the gcode core motion 
-                while not pnp_serial.online:
-                       time.sleep(0.1)  
+                if text != "Non-serial":
+                     pnp_serial = printcore('/dev/'+str(text),115200) #fixed baudrate  using the serial communication to control the gcode core motion 
+                     while not pnp_serial.online:
+                               time.sleep(0.1)  
 
                 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                 #Do process processing here for the G-code command running the fully autonomouse code on the robot 
@@ -330,11 +378,12 @@ class Worker1(QThread):
     ImageUpdate = pyqtSignal(QImage)
     def run(self):
         self.ThreadActive = True
-        Capture = cv2.VideoCapture(0)
+        Capture = cv2.VideoCapture(int(cam_num[0]))
         while self.ThreadActive:
             ret, frame = Capture.read()
             if ret:
                 Image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
                 FlippedImage = cv2.flip(Image, 1)
                 ConvertToQtFormat = QImage(FlippedImage.data, FlippedImage.shape[1], FlippedImage.shape[0], QImage.Format_RGB888)
                 Pic = ConvertToQtFormat.scaled(451, 441, Qt.KeepAspectRatio)
@@ -346,11 +395,45 @@ class Worker2(QThread):
     ImageUpdate = pyqtSignal(QImage)
     def run(self):
         self.ThreadActive = True
-        Capture = cv2.VideoCapture(2)
+        Capture = cv2.VideoCapture(int(cam_num[1])) 
+        #detector = cv2.QRCodeDetector()
         while self.ThreadActive:
+            try:
+                if Qr_listdata == []:
+                     Qr_listdata.append("No Qr_code_data")
+                if len(Qr_listdata) > 1:
+                     Qr_listdata.remove(Qr_listdata[0]) # remove the list if inside the list data has more than 1
+                     print("Qr_code_Data: ",Qr_listdata[len(Qr_listdata)-1])
+                     
+            except:
+                print("Out of range")     
             ret, frame = Capture.read()
             if ret:
                 Image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                #print(Image)
+                try:
+                   
+                   barcodes = pyzbar.decode(Image)
+                   for barcode in barcodes:
+	                              # extract the bounding box location of the barcode and draw the
+	                              # bounding box surrounding the barcode on the image
+	                              (x, y, w, h) = barcode.rect
+                                  
+	                              cv2.rectangle(Image, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                                  # the barcode data is a bytes object so if we want to draw it on
+	                              # our output image we need to convert it to a string first
+	                              barcodeData = barcode.data.decode("utf-8")
+	                              barcodeType = barcode.type
+	                              # draw the barcode data and barcode type on the image
+	                              text = "{} ({})".format(barcodeData, barcodeType)
+	                              cv2.putText(Image, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (0, 0, 255), 2)
+                                  # Add the function to output the data from hear 
+
+	                              Qr_listdata.append("[{},{},{},{}]".format(barcodeType, barcodeData,str(len(barcodes)),(x,y,w,h))) #Grab output data 
+                                  
+                except:
+
+                    print("No QRcode detected!")
                 FlippedImage = cv2.flip(Image, 1)
                 ConvertToQtFormat = QImage(FlippedImage.data, FlippedImage.shape[1], FlippedImage.shape[0], QImage.Format_RGB888)
                 Pic = ConvertToQtFormat.scaled(541, 431, Qt.KeepAspectRatio)
