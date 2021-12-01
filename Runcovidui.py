@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #Author:Chanapai Chuadchum
-#Project:Auracore color controller GUI 
-#release date:25/2/2020
+#Project:Covid detection GUI 
+#release date:13/11/2021
+import openpyxl # File converter 
 from pyzbar import pyzbar 
 import getpass 
 import cv2  # Opencv for the camera qr code tracking and the covid 19 detection data 
-import qrcode 
+import qrcode #Qr code generator with this code 
 from printrun.printcore import printcore
 from printrun import gcoder
 from PyQt5.QtCore import Qt, QSize, QTimer, QThread
@@ -52,6 +53,8 @@ name_patient =[]  #Getting the name of the patient
 age_patient = []  #Getting the age of the patient 
 username = getpass.getuser() #Getting the host of the user 
 PATHDIR = "/media/" + username #Getting the path from the list of this data 
+path_for_maketubeindex = "/home/"+username+"/"+"tubeindex/" #Path for making the tube index for the directory
+path_for_patient = "/home/"+username+"/"+"patientfiles/" #Path for making the patient directory 
 listPATH_drive = os.listdir(PATHDIR) #Getting the data inside the list of the path
 
 dirmem_ext = [] #Getting the external drive list data  
@@ -64,7 +67,32 @@ Getcam = []
 Index_cam =[] #Getting the index camera mem inside the list
 cam_num = [] # Getting the camera number 
 Qr_listdata = [] #Getting the qr code list data function
-#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Qr code data generator 
+Dictheader = {}
+Qr_prepdata = {}
+Qr_readydata = {}
+remove_patient_nan = []
+patientdata_edit = [] 
+array_patient_info = [[],[],[],[],[],[]]
+array_patient_edit = [[],[],[],[],[],[]]
+PATH_External = []
+PATH_Internal = [] 
+Patient_PATH = [] # Save the patient path 
+Tube_index_path = [] #Save the tube index path
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+   # Reference array for the data of the precise detection mod 
+Mem_process_Qr = [] #Getting the detected data from the camera qr code detection to avoiding the same position detection
+Mem_covid_dec = [] #Getting the covid data detection avoid same position detection 
+   # Create the directory for the patient and tube index
+ 
+mode = 0o775    # Mode for making the chmod permission 775   
+os.mkdir(path_for_maketubeindex,mode) #Tube index path 
+os.mkdir(path_for_patient,mode) #Patient path
+#List the path file for the data of the tube and patient matching function  
+tubeindex_list = os.listdir(path_for_maketubeindex)
+patient_list = os.listdir(path_for_patient) 
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # Camera , SerialUSB , pheripheral device detect must running in the multitasking programming to automaticly detect the devices 
 # List the camera webcam available connected with the computer 
 try:
@@ -115,22 +143,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # Covid detector page 
         #label pixmap  camera 
         self.camera = self.findChild(QLabel,"label_16")
-        self.camera.setFixedSize(451,441)
+        self.camera.setFixedSize(531,441)
         #Button function front 
-        self.pushButton_3.clicked.connect(self.Addlist) #Getting the addlist function into the Qr reader function 
-        self.pushButton_4.clicked.connect(self.Clearlist) #Clear list from the function of the Qr code 
         self.pushButton_6.clicked.connect(self.Rundetect) #Running the detector mode 
         self.pushButton_5.clicked.connect(self.Reportresult) #Report the result into the csv and pdf file 
         self.pushButton_9.clicked.connect(self.Qrgenerator_fromlist) #Getting the list of the customer to add in the list and concatinate the function of the qr code 
         self.pushButton_10.clicked.connect(self.Visual1)
-        #Textedit input 
-        self.text = self.findChild(QTextEdit,"textEdit") #Qrcodename detected for text edit 
-        self.text2 = self.findChild(QTextEdit,"textEdit_2") #Getting the match value 
-        self.text3 = self.findChild(QTextEdit,"textEdit_4") #Getting the first name of the patient 
-        self.text4 = self.findChild(QTextEdit,"textEdit_5") #Getting the last name of the patient 
-        self.text5 = self.findChild(QTextEdit,"textEdit_6") #Getting the age of the patient 
-        self.text6 = self.findChild(QTextEdit,"textEdit_7") #Getting the patient number 
-        self.text7 = self.findChild(QTextEdit,"textEdit_3") #Show the mathed latest list of the text edit mathed value 
         #Combobox external drive data 
         self.combo_external = self.findChild(QComboBox,"comboBox_2") #Getting the combobox for the external for write and read file storage 
         self.combo_external.addItem("No drive") #List of status no drive detected 
@@ -162,6 +180,16 @@ class MainWindow(QtWidgets.QMainWindow):
         #Combobox serial communication with the hardware catesian robot 
         self.comboserial = self.findChild(QComboBox,"comboBox") #Get the serial communication from the combobox 
         self.comboserial.addItem("Non-serial") # Getting the item list on the serial search function 
+        #Setting the combobox for the tube index path 
+        self.combotube = self.findChild(QComboBox,"comboBox_4") #Getting the path file for the index 
+        self.combotube.addItem("No-file")
+        self.combotube.addItems(external_file)
+        self.combotube.activated[str].connect(self.Tubeindex_path) #Sending file name to assembly with the path 
+        #Select the file to clear in the data logger 
+        self.combocleartube = self.findChild(QComboBox,"comboBox_6") #Select the file in the created directory to clear the data when the data is not csv so select the file from the list here 
+        self.combocleartube.addItem("No-file")
+        self.combocleartube.addItems(tubeindex_list)
+        self.combocleartube.activated[str].connect(self.Tube_clear_file) 
         for i in range(0,len(seriallist)):
                
               if len(str(seriallist[i]).split("USB")) >= 2:
@@ -243,32 +271,71 @@ class MainWindow(QtWidgets.QMainWindow):
              self.Worker2.ImageUpdate.connect(self.ImageUpdateSlot2)
     
     # Button Function of the covid detect page 
-    def Addlist(self): #Add list function to the dataset of the user 
-          print("Add list")
-          #Getting the patient name 
-          firstname = self.text3.toPlainText()
-          lastname  = self.text4.toPlainText()
-          age = self.text5.toPlainText() 
-          Number = self.text6.toPlainText() 
-          print(firstname,lastname,age,Number) 
-          Patientdata[Patientpersonaldata[0]] = index_number.append(str(Number))  
-          Patientdata[Patientpersonaldata[1]] = name_patient.append(str(firstname)+"\t"+str(lastname))
-          Patientdata[Patientpersonaldata[2]] = age_patient.append(str(age))
-          print("Patient json data: ",Patientdata)
-    def Clearlist(self):
-          print("Clear list")
+    def Tube_clear_file(self,text):
+              print("Clear the file name: ",text) # Getting the file name to clear in the list here 
     def Rundetect(self):
-          print("Run detection")
+          print("Run detection") # Running the covid detection camera here to activate recoding the function with motion control catesian robot
     def Reportresult(self):
           print("Report result")
     def Qrgenerator_fromlist(self):
           print("Qrcode generator")
           #Running the function of the patient data in the loop 
-          img = qrcode.make('{'+'name'+":"+"kornbot"+'}')  #Adding the data list from the add list function here
-          type(img)  # qrcode.image.pil.PilImage
-          img.save("patientname.png") #Getting the path from the text input in the combobox 
-          
-   
+          #img = qrcode.make('{'+'name'+":"+"kornbot"+'}')  #Adding the data list from the add list function here
+          #type(img)  # qrcode.image.pil.PilImage
+          #img.save("patientname.png") #Getting the path from the text input in the combobox 
+          #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+          #Getting the data from pandas library and running the data in here 
+          print("Path patient file: ",PATH_External[0]+"/"+PATH_Internal[0]) # Generate the main path of the storage devices and file for extraction 
+          print("Path tube index file: ",PATH_External[0]+"/"+Tube_index_path[0]) #Generate the main path 
+          #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+          # Detecting the file type and convert file including matching the id index with the list of the patient id 
+          internalfile = PATH_Internal[0]
+          tubeindexfile = Tube_index_path[0]
+          #Check if file type is csv and xlsx if xlsx then convert into csv file 
+          nameof_internal = internalfile.split(".")[0]
+          extention_internal = internalfile.split(".")[1] 
+          nameof_tubeindex = tubeindexfile.split(".")[0]
+          extention_tubeindex = tubeindexfile.split(".")[1]
+          if extention_internal == 'csv':
+                    print("Patient path file checking extention csv match")
+                    Patient_PATH.append(str(internalfile)) #Save the path for the pandas dataframe 
+          if extention_internal == 'xlsx':
+                    print("Start convert file extention to xlsx")
+                    xlsx = openpyxl.load_workbook(tubeindexfile) #Getting the tube index file to convert the file into the csv file and make the id match 
+                    sheet = xlsx.active
+                    data = sheet.rows
+                    #mode = 0o775    # Mode for making the chmod permission 775 
+                    #os.mkdir(path_for_patient,mode) #Patient path 
+                    csv = open("/home/"+username+"/"+str(nameof_internal)+".csv","w+") # Getting the name of the tube index file 
+                    for row in data:
+                         l = list(row)
+                         for i in range(len(l)):
+                             if i  == len(l) -1:
+                                 csv.write(str(l[i].value))
+                             else:
+                                 csv.write(str(l[i].value)+',')
+                             csv.write('\n')    
+          if extention_tubeindex == 'csv':
+                    print("Patient path file tube index checking extension csv match")
+                
+          if extention_tubeindex == 'xlsx':
+                    print("Start convert file extention to xlsx") 
+                    xlsx = openpyxl.load_workbook(tubeindexfile) #Getting the tube index file to convert the file into the csv file and make the id match 
+                    sheet = xlsx.active
+                    data = sheet.rows
+                    #mode = 0o775    # Mode for making the chmod permission 775   
+                    #os.mkdir(path_for_maketubeindex,mode) #Tube index path 
+                    csv = open("/home/"+username+"/"+str(nameof_tubeindex)+".csv","w+") # Getting the name of the tube index file 
+                    for row in data:
+                         l = list(row)
+                         for i in range(len(l)):
+                             if i  == len(l) -1:
+                                 csv.write(str(l[i].value))
+                             else:
+                                 csv.write(str(l[i].value)+',')
+                             csv.write('\n')  
+          else: 
+             print("File extension not match any cases please using support file like .csv and .xlsx")          
     #Button Function of the Top camera 
     def Homeposition_bottom(self):
            print("Home position bottom")
@@ -337,7 +404,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lcd8.display(self.slider_yb.value()) #Getting bottom slider of Y axis 
         self.lcd8.setStyleSheet("""QLCDNumber { background-color: black; }""")
 
-    def Serialfunc(self,text): #Getting the text from the list file of the serial 
+    def Serialfunc(self,text): #Getting the text from the list file of the serial
+        for i in range(0,1): 
+              for i in range(0,len(seriallist)):
+               
+                  if len(str(seriallist[i]).split("USB")) >= 2:
+
+                            serialmem1.append(str(seriallist[i])) 
+                        
+                  if len(str(seriallist[i]).split("ACM")) >= 2: 
+
+                            serialmem1.append(str(seriallist[i])) 
               print("serial_selected",text)
               try:
                 if text != "Non-serial":
@@ -351,16 +428,47 @@ class MainWindow(QtWidgets.QMainWindow):
               except:
                   print("Serial connection fail please recheck the serial communication at the pnp machine") 
     def Externaldata(self,text):
+        for i in range(0,1):
               try:
                  print("External data: ",text) #the text is the actual directory of the drive 
+                 try:
+                    if PATH_External !=[]:
+                       if PATH_External > 1:
+                            PATH_External.remove(PATH_External[0])
+                    if PATH_External == []:
+                         PATH_External.append(text)
+                 except: 
+                     print("External error non detected")
               except:
                  print("No drive found") 
     def Internalfile(self,text):
-
+        for i in range(0,1):
               try:
-                  print("Internal data: ",text)                  
+                  print("Internal data: ",text)
+                  try: 
+                     if PATH_Internal !=[]:
+                       if PATH_Internal > 1:
+                            PATH_Internal.remove(PATH_Internal[0])
+                     if PATH_Internal == []:
+                         PATH_Internal.append(text)
+                  except: 
+                       print("Internal error non detected")
               except:
                   print("No file found!") 
+    def Tubeindex_path(self,text):
+        for i in range(0,1):
+              try:
+                  print("Tube index path: ",text)  
+                  try: 
+                     if Tube_index_path !=[]:
+                       if Tube_index_path > 1:
+                            Tube_index_path.remove(Tube_index_path[0])
+                     if Tube_index_path == []:
+                         Tube_index_path.append(text)
+                  except: 
+                       print("Internal error non detected") 
+              except:
+                 print("Path not found external storage")
     def ImageUpdateSlot(self, Image):
             self.pixmap = QPixmap.fromImage(Image)
             self.camera.setPixmap(self.pixmap) 
@@ -386,7 +494,7 @@ class Worker1(QThread):
                 
                 FlippedImage = cv2.flip(Image, 1)
                 ConvertToQtFormat = QImage(FlippedImage.data, FlippedImage.shape[1], FlippedImage.shape[0], QImage.Format_RGB888)
-                Pic = ConvertToQtFormat.scaled(451, 441, Qt.KeepAspectRatio)
+                Pic = ConvertToQtFormat.scaled(531, 441, Qt.KeepAspectRatio)
                 self.ImageUpdate.emit(Pic)
     def stop(self):
         self.ThreadActive = False
@@ -427,6 +535,7 @@ class Worker2(QThread):
 	                              # draw the barcode data and barcode type on the image
 	                              text = "{} ({})".format(barcodeData, barcodeType)
 	                              cv2.putText(Image, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (0, 0, 255), 2)
+                                  
                                   # Add the function to output the data from hear 
 
 	                              Qr_listdata.append("[{},{},{},{}]".format(barcodeType, barcodeData,str(len(barcodes)),(x,y,w,h))) #Grab output data 
