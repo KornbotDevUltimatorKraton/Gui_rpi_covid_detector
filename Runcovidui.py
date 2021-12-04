@@ -54,9 +54,12 @@ age_patient = []  #Getting the age of the patient
 username = getpass.getuser() #Getting the host of the user 
 PATHDIR = "/media/" + username #Getting the path from the list of this data 
 path_for_maketubeindex = "/home/"+username+"/"+"tubeindex/" #Path for making the tube index for the directory
+tubeindex_mem_delete = [] # Deleted path for the file of tubeindex 
 path_for_patient = "/home/"+username+"/"+"patientfiles/" #Path for making the patient directory 
+patient_mem_delete = [] # Delete path fo the file of the patients 
 listPATH_drive = os.listdir(PATHDIR) #Getting the data inside the list of the path
-
+tubeindex_list = os.listdir(path_for_maketubeindex)
+patient_list = os.listdir(path_for_patient)
 dirmem_ext = [] #Getting the external drive list data  
 external_file = [] #Getting the external file in the directory
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -67,8 +70,9 @@ Getcam = []
 Index_cam =[] #Getting the index camera mem inside the list
 cam_num = [] # Getting the camera number 
 Qr_listdata = [] #Getting the qr code list data function
+Qr_ref_motion = [] #Getting the qrcode position data for reference motion tracking 
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# Qr code data generator 
+# Qr code data generator  
 Dictheader = {}
 Qr_prepdata = {}
 Qr_readydata = {}
@@ -76,6 +80,8 @@ remove_patient_nan = []
 patientdata_edit = [] 
 array_patient_info = [[],[],[],[],[],[]]
 array_patient_edit = [[],[],[],[],[],[]]
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Path data reference 
 PATH_External = []
 PATH_Internal = [] 
 Patient_PATH = [] # Save the patient path 
@@ -84,14 +90,32 @@ Tube_index_path = [] #Save the tube index path
    # Reference array for the data of the precise detection mod 
 Mem_process_Qr = [] #Getting the detected data from the camera qr code detection to avoiding the same position detection
 Mem_covid_dec = [] #Getting the covid data detection avoid same position detection 
+    # Getting the len of the data inside the array 
+Row_len = []  
+Column_len = []
+Header_build = [] 
+Index_tuber = []
+dictcsv = {}
+dict_complete_query = {} # Getting the dictionary of the data for comparation process
+Tube_mem = []
    # Create the directory for the patient and tube index
- 
-mode = 0o775    # Mode for making the chmod permission 775   
-os.mkdir(path_for_maketubeindex,mode) #Tube index path 
-os.mkdir(path_for_patient,mode) #Patient path
-#List the path file for the data of the tube and patient matching function  
-tubeindex_list = os.listdir(path_for_maketubeindex)
-patient_list = os.listdir(path_for_patient) 
+Row_patients_len = []  
+Column_patients_len = []
+Header_patients = []
+Index_patients = []
+dictpatientcsv = {}
+dict_patients_query = {} # Getting the data of the patient query from the tube index code 
+Patients_mem = []
+try: 
+   print("Creating the tubeindex and patient directory")
+   mode = 0o775    # Mode for making the chmod permission 775   
+   os.mkdir(path_for_maketubeindex,mode) #Tube index path 
+   os.mkdir(path_for_patient,mode) #Patient path
+   #List the path file for the data of the tube and patient matching function  
+   tubeindex_list = os.listdir(path_for_maketubeindex)
+   patient_list = os.listdir(path_for_patient) 
+except:
+    print("Directory was created")
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # Camera , SerialUSB , pheripheral device detect must running in the multitasking programming to automaticly detect the devices 
 # List the camera webcam available connected with the computer 
@@ -127,7 +151,8 @@ try:
 except: 
     print("No such camera device found!")
 
-print(Index_cam) #Show the index cam list to using inside the 
+print(Index_cam) #Show the index cam list to using inside the terminal 
+
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, *args, **kwargs):
@@ -149,6 +174,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pushButton_5.clicked.connect(self.Reportresult) #Report the result into the csv and pdf file 
         self.pushButton_9.clicked.connect(self.Qrgenerator_fromlist) #Getting the list of the customer to add in the list and concatinate the function of the qr code 
         self.pushButton_10.clicked.connect(self.Visual1)
+        self.pushButton_3.clicked.connect(self.Clear_Selected_file) #Clear the selected file 
+        self.pushButton_4.clicked.connect(self.Clear_all_files) #Clear all the file selected from the patient and tube index inside the list 
+
         #Combobox external drive data 
         self.combo_external = self.findChild(QComboBox,"comboBox_2") #Getting the combobox for the external for write and read file storage 
         self.combo_external.addItem("No drive") #List of status no drive detected 
@@ -186,10 +214,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.combotube.addItems(external_file)
         self.combotube.activated[str].connect(self.Tubeindex_path) #Sending file name to assembly with the path 
         #Select the file to clear in the data logger 
-        self.combocleartube = self.findChild(QComboBox,"comboBox_6") #Select the file in the created directory to clear the data when the data is not csv so select the file from the list here 
+        self.combocleartube = self.findChild(QComboBox,"comboBox_5") #Select the file in the created directory to clear the data when the data is not csv so select the file from the list here 
         self.combocleartube.addItem("No-file")
-        self.combocleartube.addItems(tubeindex_list)
+        self.combocleartube.addItems(tubeindex_list) # Getting the data from tubeindex list 
         self.combocleartube.activated[str].connect(self.Tube_clear_file) 
+
+        self.comboclearpatient = self.findChild(QComboBox,"comboBox_6") # Select the file in the created directory to clear the data 
+        self.comboclearpatient.addItem("No-file")
+        self.comboclearpatient.addItems(patient_list) #Getting the data from the patient list 
+        self.comboclearpatient.activated[str].connect(self.Patient_clear_file) # combobox data visualize on the list 
+        
         for i in range(0,len(seriallist)):
                
               if len(str(seriallist[i]).split("USB")) >= 2:
@@ -270,13 +304,83 @@ class MainWindow(QtWidgets.QMainWindow):
              self.Worker2.start()
              self.Worker2.ImageUpdate.connect(self.ImageUpdateSlot2)
     
-    # Button Function of the covid detect page 
+    # Combobox function 
+    def Patient_clear_file(self,text):
+        print("Clear the patients file name: ",text) # Getting the file name to make the path for clear the file 
+        for r in range(0,1):
+             self.comboclearpatient.clear()
+             self.comboclearpatient.addItem("No-file")
+             self.comboclearpatient.addItems(patient_list) 
+             if patient_mem_delete != []:
+                 try:
+                    if len(patient_mem_delete) > 1:
+                            
+                             patient_mem_delete.remove(patient_mem_delete[0])
+                             listtemsPatient = self.comboclearpatient.allItems() 
+                             print(listtemsPatient)
+                 except:
+                     print("File in directory was deleted")
+             if patient_mem_delete == []: 
+                       
+                          patient_mem_delete.append(path_for_patient+text)
     def Tube_clear_file(self,text):
-              print("Clear the file name: ",text) # Getting the file name to clear in the list here 
+         print("Clear the file name: ",text) # Getting the file name  to make the path for clear the file 
+         for r in range(0,1): 
+              self.comboclearpatient.clear()
+              self.comboclearpatient.addItem("No-file")
+              self.comboclearpatient.addItems(tubeindex_list) 
+              if tubeindex_mem_delete != []:
+                  
+                  try:
+                     if len(tubeindex_mem_delete) > 1:
+                           
+                           tubeindex_mem_delete.remove(tubeindex_mem_delete[0]) # Delete the first element inside the list only leave the new list
+                           
+                  except: 
+                       print("File in directory was deleted") 
+              if tubeindex_mem_delete == []:
+                       
+                       tubeindex_mem_delete.append(path_for_maketubeindex+text) # Adding the path into the list memory for delete the data 
+                         
+    # Button Function of the covid detect page
+    def Clear_Selected_file(self):
+        print("Delete selected file")
+        for r in range(0,1):
+             if os.path.exists(tubeindex_mem_delete[0]):
+                   
+                   # removing the file using the os.remove() method
+                   try:
+                       os.remove(tubeindex_mem_delete[0])
+                       self.comboclearpatient.clear()
+                       self.comboclearpatient.addItem("No-file")
+                       #self.comboclearpatient.addItems(tubeindex_list)                       
+                   except:
+                       print("File not found in the directory")
+             if os.path.exists(patient_mem_delete[0]):
+                   # removing the file using the os.remove() method
+                   try:
+                       os.remove(patient_mem_delete[0])
+                       self.comboclearpatient.clear()
+                       self.comboclearpatient.addItem("No-file")
+                       #self.comboclearpatient.addItems(patient_list)
+                   except:
+                       print("File not found in the directory")
+    def Clear_all_files(self):
+        print("Delete all files")
+        for r in range(0,1):
+               
+             if os.path.exists(patient_mem_delete[0]):
+                 
+                # removing the file using the os.remove() method
+                try:    
+                   os.remove(patient_mem_delete[0])
+                except: 
+                   print("File not found in the directory")
     def Rundetect(self):
           print("Run detection") # Running the covid detection camera here to activate recoding the function with motion control catesian robot
     def Reportresult(self):
-          print("Report result")
+          print("Report result") # Report pdf file from the csv data frame 
+
     def Qrgenerator_fromlist(self):
           print("Qrcode generator")
           #Running the function of the patient data in the loop 
@@ -284,11 +388,26 @@ class MainWindow(QtWidgets.QMainWindow):
           #type(img)  # qrcode.image.pil.PilImage
           #img.save("patientname.png") #Getting the path from the text input in the combobox 
           #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-          #Getting the data from pandas library and running the data in here 
-          print("Path patient file: ",PATH_External[0]+"/"+PATH_Internal[0]) # Generate the main path of the storage devices and file for extraction 
-          print("Path tube index file: ",PATH_External[0]+"/"+Tube_index_path[0]) #Generate the main path 
+          #Getting the data from pandas library and running the data in here
+          try:
+             print("Path patient file: ",PATH_External[0]+"/"+PATH_Internal[0]) # Generate the main path of the storage devices and file for extraction 
+             internalfile = PATH_Internal[0]
+             nameof_internal = internalfile.split(".")[0]
+             extention_internal = internalfile.split(".")[1] 
+
+          except:
+              print("No file input from combobox")  
+          try:
+             print("Path tube index file: ",PATH_External[0]+"/"+Tube_index_path[0]) #Generate the main path 
+             tubeindexfile = Tube_index_path[0]
+             nameof_tubeindex = tubeindexfile.split(".")[0]
+             extention_tubeindex = tubeindexfile.split(".")[1]
+
+          except:
+              print("No file input from combobox")
           #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
           # Detecting the file type and convert file including matching the id index with the list of the patient id 
+          """
           internalfile = PATH_Internal[0]
           tubeindexfile = Tube_index_path[0]
           #Check if file type is csv and xlsx if xlsx then convert into csv file 
@@ -296,44 +415,100 @@ class MainWindow(QtWidgets.QMainWindow):
           extention_internal = internalfile.split(".")[1] 
           nameof_tubeindex = tubeindexfile.split(".")[0]
           extention_tubeindex = tubeindexfile.split(".")[1]
-          if extention_internal == 'csv':
-                    print("Patient path file checking extention csv match")
-                    Patient_PATH.append(str(internalfile)) #Save the path for the pandas dataframe 
-          if extention_internal == 'xlsx':
+          """
+          try:
+             if extention_internal == 'xlsx':
+               try:
                     print("Start convert file extention to xlsx")
-                    xlsx = openpyxl.load_workbook(tubeindexfile) #Getting the tube index file to convert the file into the csv file and make the id match 
-                    sheet = xlsx.active
-                    data = sheet.rows
-                    #mode = 0o775    # Mode for making the chmod permission 775 
-                    #os.mkdir(path_for_patient,mode) #Patient path 
-                    csv = open("/home/"+username+"/"+str(nameof_internal)+".csv","w+") # Getting the name of the tube index file 
-                    for row in data:
-                         l = list(row)
-                         for i in range(len(l)):
-                             if i  == len(l) -1:
-                                 csv.write(str(l[i].value))
-                             else:
-                                 csv.write(str(l[i].value)+',')
-                             csv.write('\n')    
-          if extention_tubeindex == 'csv':
-                    print("Patient path file tube index checking extension csv match")
-                
-          if extention_tubeindex == 'xlsx':
+                    Path_dataframe_internal = PATH_External[0]+"/"+PATH_Internal[0] 
+                    print(Path_dataframe_internal)
+                    wb_obj = openpyxl.load_workbook(Path_dataframe_internal)
+                    sheet_obj = wb_obj.active 
+                    for i in sheet_obj.iter_rows(max_row=0):
+                                 #print(len(i))
+                                 Row_patients_len.append(len(i))    
+                    column=sheet_obj['A']
+                    #print(column,len(column))
+                    Column_patients_len.append(len(column))
+                    for memr in range(0,Column_patients_len[0]):
+                               Patients_mem.append([])
+                    #print(Tube_mem)
+                    #print(Row_len[len(Row_len)-1],Column_len[0])
+                    ## Running the loop of the row and column function 
+                    for k in range(1,Column_patients_len[0]+1):
+                          for q in range(1,Row_patients_len[len(Row_patients_len)-1]+1):
+                             #q = 2
+                             tubeindex = sheet_obj.cell(row = k, column = q)
+                             #print(k,q,tubeindex.value)
+                             Patients_mem[k-1].append(tubeindex.value)
+                    #print(Tube_mem)
+                    row_header = Patients_mem[0]
+                    for h in range(0,Column_patients_len[0]+1):
+                           Header_patients.append("P"+str(h))
+                    #print("Header: ",Header_build)
+                    for r in range(1,len(Patients_mem)):
+                            dictpatientcsv[Header_patients[r]] = Patients_mem[r]
+                    #print(dictcsv)
+                    for rew in list(dictpatientcsv):
+                           print(rew,dictpatientcsv.get(rew))
+                    for wed in range(0,len(list(dictpatientcsv))):
+                           Index_patients.append(list(dictpatientcsv.values())[wed][0])
+                    for head in range(0,len(Index_patients)):
+                              dict_patients_query[Index_patients[head]]  = list(dictpatientcsv.values())[head]
+
+                    print(dict_patients_query)
+               except: 
+                   print("No file input from combo box")   
+          except:
+              print("No file input from combobox")
+          try:
+            if extention_tubeindex == 'xlsx':
+                try:
                     print("Start convert file extention to xlsx") 
-                    xlsx = openpyxl.load_workbook(tubeindexfile) #Getting the tube index file to convert the file into the csv file and make the id match 
-                    sheet = xlsx.active
-                    data = sheet.rows
-                    #mode = 0o775    # Mode for making the chmod permission 775   
-                    #os.mkdir(path_for_maketubeindex,mode) #Tube index path 
-                    csv = open("/home/"+username+"/"+str(nameof_tubeindex)+".csv","w+") # Getting the name of the tube index file 
-                    for row in data:
-                         l = list(row)
-                         for i in range(len(l)):
-                             if i  == len(l) -1:
-                                 csv.write(str(l[i].value))
-                             else:
-                                 csv.write(str(l[i].value)+',')
-                             csv.write('\n')  
+                    Path_dataframe_tubeindex = PATH_External[0]+"/"+Tube_index_path[0]
+                    print(Path_dataframe_tubeindex)
+                    wb_obj = openpyxl.load_workbook(Path_dataframe_tubeindex)
+                    sheet_obj = wb_obj.active 
+                    for i in sheet_obj.iter_rows(max_row=0):
+                                 #print(len(i))
+                                 Row_len.append(len(i))    
+                    column=sheet_obj['A']
+                    #print(column,len(column))
+                    Column_len.append(len(column))
+                    for memr in range(0,Column_len[0]):
+                               Tube_mem.append([])
+                    #print(Tube_mem)
+                    #print(Row_len[len(Row_len)-1],Column_len[0])
+                    ## Running the loop of the row and column function 
+                    for k in range(1,Column_len[0]+1):
+                          for q in range(1,Row_len[len(Row_len)-1]+1):
+                             #q = 2
+                             tubeindex = sheet_obj.cell(row = k, column = q)
+                             #print(k,q,tubeindex.value)
+                             Tube_mem[k-1].append(tubeindex.value)
+                    #print(Tube_mem)
+                    row_header = Tube_mem[0]
+                    for h in range(0,Column_len[0]+1):
+                           Header_build.append("P"+str(h))
+                    #print("Header: ",Header_build)
+                    for r in range(1,len(Tube_mem)):
+                            dictcsv[Header_build[r]] = Tube_mem[r]
+                    #print(dictcsv)
+                    for rew in list(dictcsv):
+                           print(rew,dictcsv.get(rew))
+                    for wed in range(0,len(list(dictcsv))):
+                           Index_tuber.append(list(dictcsv.values())[wed][0])
+                    try:
+                        for head in range(0,len(Index_tuber)):
+                              dict_complete_query[Index_tuber[head]]  = list(dictcsv.values())[head]
+
+                        print(dict_complete_query)
+                    except: 
+                         print("Out of range")
+                except: 
+                   print("No file input from combo box")
+          except:
+              print("No file input")      
           else: 
              print("File extension not match any cases please using support file like .csv and .xlsx")          
     #Button Function of the Top camera 
@@ -457,6 +632,7 @@ class MainWindow(QtWidgets.QMainWindow):
                   print("No file found!") 
     def Tubeindex_path(self,text):
         for i in range(0,1):
+              self.combotube.addItems(external_file)
               try:
                   print("Tube index path: ",text)  
                   try: 
@@ -511,7 +687,20 @@ class Worker2(QThread):
                      Qr_listdata.append("No Qr_code_data")
                 if len(Qr_listdata) > 1:
                      Qr_listdata.remove(Qr_listdata[0]) # remove the list if inside the list data has more than 1
-                     print("Qr_code_Data: ",Qr_listdata[len(Qr_listdata)-1])
+                     print("Qr_code_Data: ",Qr_listdata[len(Qr_listdata)-1]) # Getting the data from the list here to processing data of patient loop processing 
+                     
+                     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+                     # Processing the patient data here query the data from the tube index code 
+                     print(Qr_listdata[0],type(Qr_listdata[0]),Qr_listdata[0].split(",")[1])
+                     Tube_index_number = Qr_listdata[0].split(",")[1]  # Extracted the data from the tube code index output 
+                     print(dict_complete_query.get(int(Tube_index_number)))
+                     listPatients_code = dict_complete_query.get(int(Tube_index_number))
+                     tb_index = len(dict_complete_query.get(int(Tube_index_number)))
+                     for code in range(1,tb_index):
+                               print(listPatients_code[code],dict_patients_query.get(listPatients_code[code])) #Extracted patients name
+                               print(dict_patients_query[listPatients_code[code]].append("1"))
+                
+                     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                      
             except:
                 print("Out of range")     
