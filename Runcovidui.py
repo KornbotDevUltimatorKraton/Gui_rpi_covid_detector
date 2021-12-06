@@ -16,11 +16,11 @@ from PyQt5 import QtCore, QtWidgets, uic,Qt,QtGui
 from PyQt5.QtWidgets import QApplication,QTreeView,QDirModel,QFileSystemModel,QVBoxLayout, QTreeWidget,QStyledItemDelegate, QTreeWidgetItem,QLabel,QGridLayout,QLineEdit,QDial,QComboBox,QPushButton 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QPixmap,QIcon,QImage,QPalette,QBrush
-from pyqtgraph.Qt import QtCore, QtGui   #PyQt graph to control the model grphic loaded  
+#from pyqtgraph.Qt import QtCore, QtGui   #PyQt graph to control the model grphic loaded  
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-import pyqtgraph.opengl as gl
+#import pyqtgraph.opengl as gl
 import pandas as pd # Reading the pandas data from the csv data of the patient 
 import csv #reading the csv file data 
 import re
@@ -58,8 +58,7 @@ tubeindex_mem_delete = [] # Deleted path for the file of tubeindex
 path_for_patient = "/home/"+username+"/"+"patientfiles/" #Path for making the patient directory 
 patient_mem_delete = [] # Delete path fo the file of the patients 
 listPATH_drive = os.listdir(PATHDIR) #Getting the data inside the list of the path
-tubeindex_list = os.listdir(path_for_maketubeindex)
-patient_list = os.listdir(path_for_patient)
+
 dirmem_ext = [] #Getting the external drive list data  
 external_file = [] #Getting the external file in the directory
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -122,6 +121,8 @@ try:
    patient_list = os.listdir(path_for_patient) 
 except:
     print("Directory was created")
+tubeindex_list = os.listdir(path_for_maketubeindex)
+patient_list = os.listdir(path_for_patient)
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # Camera , SerialUSB , pheripheral device detect must running in the multitasking programming to automaticly detect the devices 
 # List the camera webcam available connected with the computer 
@@ -337,7 +338,6 @@ class MainWindow(QtWidgets.QMainWindow):
                        os.remove(tubeindex_mem_delete[0])
                        self.comboclearpatient.clear()
                        self.comboclearpatient.addItem("No-file")
-                       #self.comboclearpatient.addItems(tubeindex_list)                       
                    except:
                        print("File not found in the directory")
              if os.path.exists(patient_mem_delete[0]):
@@ -346,7 +346,6 @@ class MainWindow(QtWidgets.QMainWindow):
                        os.remove(patient_mem_delete[0])
                        self.comboclearpatient.clear()
                        self.comboclearpatient.addItem("No-file")
-                       #self.comboclearpatient.addItems(patient_list)
                    except:
                        print("File not found in the directory")
     def Clear_all_files(self):
