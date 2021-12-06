@@ -76,7 +76,7 @@
       <property name="geometry">
        <rect>
         <x>550</x>
-        <y>150</y>
+        <y>90</y>
         <width>121</width>
         <height>31</height>
        </rect>
@@ -85,8 +85,8 @@
      <widget class="QLabel" name="label_24">
       <property name="geometry">
        <rect>
-        <x>550</x>
-        <y>130</y>
+        <x>560</x>
+        <y>70</y>
         <width>111</width>
         <height>20</height>
        </rect>
@@ -145,7 +145,7 @@
       <property name="geometry">
        <rect>
         <x>560</x>
-        <y>200</y>
+        <y>130</y>
         <width>89</width>
         <height>31</height>
        </rect>
@@ -203,7 +203,20 @@
        <string>Tube index</string>
       </property>
      </widget>
-     <widget class="QComboBox" name="comboBox_5">
+     <widget class="QLabel" name="label_20">
+      <property name="geometry">
+       <rect>
+        <x>550</x>
+        <y>10</y>
+        <width>131</width>
+        <height>20</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Clear patients pdf</string>
+      </property>
+     </widget>
+     <widget class="QComboBox" name="comboBox_6">
       <property name="geometry">
        <rect>
         <x>560</x>
@@ -213,47 +226,11 @@
        </rect>
       </property>
      </widget>
-     <widget class="QLabel" name="label_19">
-      <property name="geometry">
-       <rect>
-        <x>560</x>
-        <y>10</y>
-        <width>111</width>
-        <height>17</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Clear tubeindex</string>
-      </property>
-     </widget>
-     <widget class="QLabel" name="label_20">
-      <property name="geometry">
-       <rect>
-        <x>560</x>
-        <y>70</y>
-        <width>101</width>
-        <height>17</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Clear Patients</string>
-      </property>
-     </widget>
-     <widget class="QComboBox" name="comboBox_6">
-      <property name="geometry">
-       <rect>
-        <x>560</x>
-        <y>90</y>
-        <width>101</width>
-        <height>31</height>
-       </rect>
-      </property>
-     </widget>
      <widget class="QPushButton" name="pushButton_3">
       <property name="geometry">
        <rect>
-        <x>560</x>
-        <y>250</y>
+        <x>550</x>
+        <y>200</y>
         <width>111</width>
         <height>31</height>
        </rect>
@@ -265,8 +242,8 @@
      <widget class="QPushButton" name="pushButton_4">
       <property name="geometry">
        <rect>
-        <x>560</x>
-        <y>290</y>
+        <x>550</x>
+        <y>250</y>
         <width>101</width>
         <height>31</height>
        </rect>

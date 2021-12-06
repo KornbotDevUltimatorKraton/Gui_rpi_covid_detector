@@ -106,6 +106,12 @@ Index_patients = []
 dictpatientcsv = {}
 dict_patients_query = {} # Getting the data of the patient query from the tube index code 
 Patients_mem = []
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+   #Getting the data from the covid detector status 
+Refferrence_len_array = [] # Ref array len to store the status of
+Covid_ref_status = [] # Getting the covid status 
+Covid_tubeindex_liststatus = {} # Getting the tube index status containing x,y position of the covid detection  
+
 try: 
    print("Creating the tubeindex and patient directory")
    mode = 0o775    # Mode for making the chmod permission 775   
@@ -213,11 +219,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.combotube.addItem("No-file")
         self.combotube.addItems(external_file)
         self.combotube.activated[str].connect(self.Tubeindex_path) #Sending file name to assembly with the path 
-        #Select the file to clear in the data logger 
-        self.combocleartube = self.findChild(QComboBox,"comboBox_5") #Select the file in the created directory to clear the data when the data is not csv so select the file from the list here 
-        self.combocleartube.addItem("No-file")
-        self.combocleartube.addItems(tubeindex_list) # Getting the data from tubeindex list 
-        self.combocleartube.activated[str].connect(self.Tube_clear_file) 
+       
 
         self.comboclearpatient = self.findChild(QComboBox,"comboBox_6") # Select the file in the created directory to clear the data 
         self.comboclearpatient.addItem("No-file")
@@ -323,25 +325,7 @@ class MainWindow(QtWidgets.QMainWindow):
              if patient_mem_delete == []: 
                        
                           patient_mem_delete.append(path_for_patient+text)
-    def Tube_clear_file(self,text):
-         print("Clear the file name: ",text) # Getting the file name  to make the path for clear the file 
-         for r in range(0,1): 
-              self.comboclearpatient.clear()
-              self.comboclearpatient.addItem("No-file")
-              self.comboclearpatient.addItems(tubeindex_list) 
-              if tubeindex_mem_delete != []:
-                  
-                  try:
-                     if len(tubeindex_mem_delete) > 1:
-                           
-                           tubeindex_mem_delete.remove(tubeindex_mem_delete[0]) # Delete the first element inside the list only leave the new list
-                           
-                  except: 
-                       print("File in directory was deleted") 
-              if tubeindex_mem_delete == []:
-                       
-                       tubeindex_mem_delete.append(path_for_maketubeindex+text) # Adding the path into the list memory for delete the data 
-                         
+   
     # Button Function of the covid detect page
     def Clear_Selected_file(self):
         print("Delete selected file")
@@ -514,10 +498,10 @@ class MainWindow(QtWidgets.QMainWindow):
     #Button Function of the Top camera 
     def Homeposition_bottom(self):
            print("Home position bottom")
-
+           
     def Auto_calibration_bottom(self): 
            print("Auto calibration bottom")
-
+          
     #Dial data 
     def Light_intense_top(self): 
           print("Light intensity top: ",self.dial1.value())
@@ -657,7 +641,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 def Gcodecontrollermotion(Xt,Yt,Xb,Yb): #Getting the motion control function for the catesian robot 
         print(Xt,Yt,Xb,Yb) #Getting the value from each axis input from each catesian robot 
-    
+        
 class Worker1(QThread):
     ImageUpdate = pyqtSignal(QImage)
     def run(self):
@@ -698,8 +682,8 @@ class Worker2(QThread):
                      tb_index = len(dict_complete_query.get(int(Tube_index_number)))
                      for code in range(1,tb_index):
                                print(listPatients_code[code],dict_patients_query.get(listPatients_code[code])) #Extracted patients name
-                               print(dict_patients_query[listPatients_code[code]].append("1"))
-                
+                               
+                                           
                      #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                      
             except:
@@ -724,9 +708,7 @@ class Worker2(QThread):
 	                              # draw the barcode data and barcode type on the image
 	                              text = "{} ({})".format(barcodeData, barcodeType)
 	                              cv2.putText(Image, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (0, 0, 255), 2)
-                                  
                                   # Add the function to output the data from hear 
-
 	                              Qr_listdata.append("[{},{},{},{}]".format(barcodeType, barcodeData,str(len(barcodes)),(x,y,w,h))) #Grab output data 
                                   
                 except:
@@ -746,7 +728,5 @@ def main():
     main.show()
     sys.exit(app.exec_())
 
-
-    
 if __name__ == '__main__':         
       main()
