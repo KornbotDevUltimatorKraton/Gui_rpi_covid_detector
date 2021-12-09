@@ -11,7 +11,8 @@ import qrcode #Qr code generator with this code
 from printrun.printcore import printcore
 from printrun import gcoder
 from PyQt5.QtCore import Qt, QSize, QTimer, QThread
-
+#import spidev # This library only working on the rpi hardware to control the gpio 
+#import ws2812 # Getting the ws2813 communicate with the hardware direcly
 from PyQt5 import QtCore, QtWidgets, uic,Qt,QtGui 
 from PyQt5.QtWidgets import QApplication,QTreeView,QDirModel,QFileSystemModel,QVBoxLayout, QTreeWidget,QStyledItemDelegate, QTreeWidgetItem,QLabel,QGridLayout,QLineEdit,QDial,QComboBox,QPushButton 
 from PyQt5.QtWidgets import *
@@ -28,6 +29,9 @@ import os
 import sys
 import serial # Serial protocol for connecting to the pheripheral devices like microcontroller 
 import time
+import getopt
+import numpy
+from numpy import sin, pi
 import subprocess # subprocess for running the command inside the linux system 
 config_Data = {"Top_catesian":{'x':200,'y':200},"Bottom_catesian":{'x':200,'y':200}} #Configuretion data in json for the stepper motor control step co-ordination
 #Setting the current position in array 
@@ -37,7 +41,7 @@ yt_array =[]
 #Bottom cam catesian robot 
 xb_array = [] 
 yb_array = []
-
+Devices_mem = [] # Devices mem the serial device
 #Calibration interval from the auto calibration 
 Qr_interval = [] 
 Covid_interval = []
@@ -105,12 +109,16 @@ Index_patients = []
 dictpatientcsv = {}
 dict_patients_query = {} # Getting the data of the patient query from the tube index code 
 Patients_mem = []
+Groupping_Patient = [] # Grouping the patient data 
+Ref_group = [] # Reference group for the data of the patient 
+Patient_qr_member = {} # Getting the member of the patient on the qr code detection 
+
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
    #Getting the data from the covid detector status 
 Refferrence_len_array = [] # Ref array len to store the status of
 Covid_ref_status = [] # Getting the covid status 
 Covid_tubeindex_liststatus = {} # Getting the tube index status containing x,y position of the covid detection  
-
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 try: 
    print("Creating the tubeindex and patient directory")
    mode = 0o775    # Mode for making the chmod permission 775   
@@ -251,8 +259,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         #Button control 
         self.pushButton_7.clicked.connect(self.Homeposition_top) #Getting the home position for the top catesian robot 
-        self.pushButton.clicked.connect(self.Auto_calibration_top) #Getting the auto positioning calibration  and setting the interval of testtube pitch by itself
-        self.camon2 = self.findChild(QPushButton,"pushButton_11")
+        self.pushButton.clicked.connect(self.Y_axis_neg_top)     #Getting the Y axis negative control 
+        self.pushButton_14.clicked.connect(self.Y_axis_pos_top) #Getting the Y axis positive control 
+        self.pushButton_15.clicked.connect(self.X_axis_pos_top) #Getting the X axis positive control
+        self.pushButton_16.clicked.connect(self.X_axis_neg_top) #Getting the X axis negative control 
+        
+        self.camon2 = self.findChild(QPushButton,"pushButton_11") 
         self.camon2.clicked.connect(self.Visual2) #Getting the camera top view on detecting the QRcode and calibrate position 
         #Dial control 
         self.dial1 = self.findChild(QDial,"dial") # Getting the dial 1 for the function of the light intensity control 
@@ -276,7 +288,11 @@ class MainWindow(QtWidgets.QMainWindow):
         #Bottom camera 
         #Button control 
         self.pushButton_8.clicked.connect(self.Homeposition_bottom) 
-        self.pushButton_2.clicked.connect(self.Auto_calibration_bottom)
+        self.pushButton_2.clicked.connect(self.Y_axis_neg_bottom)  # Getting the Y negative axis control 
+        self.pushButton_19.clicked.connect(self.Y_axis_pos_bottom) # Getting the Y positive axis control 
+        self.pushButton_17.clicked.connect(self.X_axis_pos_bottom) # Getting the X positive axis control 
+        self.pushButton_18.clicked.connect(self.X_axis_neg_bottom) # Getting the X negative axis control 
+
         self.dial3 = self.findChild(QDial,"dial_3") #Getting the dial 3 for the function of light intensity control 
         self.dial3.setMinimum(0)
         self.dial3.setMaximum(255) # PWM output control function
@@ -292,7 +308,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.slider_yb.setMinimum(0)
         self.slider_yb.setMaximum(config_Data.get('Bottom_catesian').get('y'))
         self.slider_yb.valueChanged.connect(self.Bottom_yb)
-        
+        #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        #Pause and Resume button 
+        self.pushButton_12.clicked.connect(self.Pausemotion) # Setting the pause motion control 
+        self.pushButton_13.clicked.connect(self.Resumemotion) # Setting the resume motion control 
+
 
     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     #Camera 
@@ -360,7 +380,29 @@ class MainWindow(QtWidgets.QMainWindow):
                 except: 
                    print("File not found in the directory")
     def Rundetect(self):
-          print("Run detection") # Running the covid detection camera here to activate recoding the function with motion control catesian robot
+              print("Run detection") # Running the covid detection camera here to activate recoding the function with motion control catesian robot
+              try:
+                     pnp_serial = printcore('/dev/'+str(Devices_mem[0]),115200) #fixed baudrate  using the serial communication to control the gcode core motion 
+                     while not pnp_serial.online:
+                               time.sleep(0.1)  
+                     pnp_serial.send_now("G0 X0 Y0") # Home position 
+                     pnp_serial.send_now("M302 P0") # this will send M105 immediately, ahead of the rest of the print
+                     pnp_serial.send_now("M302 S0")
+                     pnp_serial.send_now("M106 S190")
+                     pnp_serial.send_now("G0 X100 Y200")
+                     pnp_serial.send_now("G0 E050")
+                     pnp_serial.send_now("G0 Z170")
+                     pnp_serial.send_now("G0 Z0")
+                     pnp_serial.send_now("G0 E00")
+                     pnp_serial.send_now("G0 E1180")
+                     pnp_serial.send_now("G0 X0 Y0")
+                     pnp_serial.send_now("M106 S0")
+                     pnp_serial.pause() # use these to pause/resume the current print
+                     pnp_serial.resume() 
+                     pnp_serial.disconnect() # this is how you disconnect from the printer once you are done. This will also stop running prints.
+
+              except:
+                 print("Error serial connection loss on hardware")
     def Reportresult(self):
           print("Report result") # Report pdf file from the csv data frame 
 
@@ -497,9 +539,22 @@ class MainWindow(QtWidgets.QMainWindow):
     #Button Function of the Top camera 
     def Homeposition_bottom(self):
            print("Home position bottom")
-           
-    def Auto_calibration_bottom(self): 
-           print("Auto calibration bottom")
+           try:
+              print(Devices_mem[0])
+              if Devices_mem[0] != "Non-serial": 
+                p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+                #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+                #gcode = gcoder.LightGCode(gcode)
+                # startprint silently exits if not connected yet
+                while not p.online:
+                     time.sleep(0.1)
+                p.send_now("G0 Z0") # Setting the home position 
+                p.send_now("G0 E0") # Setting the home position 
+                p.resume() # Pause the stepper motor
+                p.disconnect() 
+           except:
+                 print("Serial device not found") 
+  
           
     #Dial data 
     def Light_intense_top(self): 
@@ -507,18 +562,159 @@ class MainWindow(QtWidgets.QMainWindow):
           self.lcd1 = self.findChild(QLCDNumber,"lcdNumber")
           self.lcd1.display(self.dial1.value())
           self.lcd1.setStyleSheet("""QLCDNumber { background-color: black; }""")
- 
+          
     def Light_intense_bottom(self):
           print("Light intensity bottom: ",self.dial3.value())
           self.lcd2 = self.findChild(QLCDNumber,"lcdNumber_5") 
           self.lcd2.display(self.dial3.value())
           self.lcd2.setStyleSheet("""QLCDNumber { background-color: black; }""")
-
+          #spi = spidev.SpiDev()
+          #spi.open(0,0)  
+          mode = 'loop' # Getting the mode setting function
+          #WS2812_controller(spi,mode,nLED,intensity) # Getting the light intensity input function to control the ws2812 rgb control 
     #Button Function of the Bottom camera 
     def Homeposition_top(self):
           print("Home position top")
-    def Auto_calibration_top(self):
-          print("Auto calibration top")
+          try:
+              print(Devices_mem[0])
+              if Devices_mem[0] != "Non-serial": 
+                p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+                #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+                #gcode = gcoder.LightGCode(gcode)
+                # startprint silently exits if not connected yet
+                while not p.online:
+                     time.sleep(0.1)
+                p.send_now("G0 Z0 E00")    
+                p.resume() # Pause the stepper motor
+                p.disconnect() 
+          except:
+                 print("Serial device not found") 
+    def Y_axis_neg_top(self):
+        print("-Y: ",-yt_array[0]) # Array control the y neg axis 
+        p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+        #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+        #gcode = gcoder.LightGCode(gcode)
+        # startprint silently exits if not connected yet
+        gcode_send_Xt = "G0 "+"E-0"+str(yt_array[0])
+        while not p.online:
+                time.sleep(0.1)
+        p.send_now("M302 P0") # this will send M105 immediately, ahead of the rest of the print
+        p.send_now("M302 S0")
+        #p.send_now("M106 S190")
+        p.send_now(gcode_send_Xt)
+        p.pause()
+        p.resume()
+        p.disconnect()
+    
+    def Y_axis_pos_top(self):
+        print("+Y: ",yt_array[0])  # Array control the y pos axis 
+        p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+        #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+        #gcode = gcoder.LightGCode(gcode)
+        # startprint silently exits if not connected yet
+        gcode_send_Xt = "G0 "+"E0"+str(yt_array[0])
+        while not p.online:
+                time.sleep(0.1)
+        p.send_now("M302 P0") # this will send M105 immediately, ahead of the rest of the print
+        p.send_now("M302 S0")
+        #p.send_now("M106 S190")
+        p.send_now(gcode_send_Xt)
+        p.pause()
+        p.resume()
+        p.disconnect()
+    def X_axis_pos_top(self):     
+        print("+X: ",xt_array[0])  # Array control the x pos axis 
+        p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+        #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+        #gcode = gcoder.LightGCode(gcode)
+        # startprint silently exits if not connected yet
+        gcode_send_Xt = "G0 "+"Z"+str(xt_array[0])
+        while not p.online:
+                time.sleep(0.1)
+        p.send_now(gcode_send_Xt)
+        p.pause()
+        p.resume()
+        p.disconnect() 
+
+    def X_axis_neg_top(self):
+        print("-X: ",-xt_array[0]) # Array control the x neg axis 
+        p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+        #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+        #gcode = gcoder.LightGCode(gcode)
+        # startprint silently exits if not connected yet
+        gcode_send_Xt = "G0 "+"Z-"+str(xt_array[0])
+        while not p.online:
+                time.sleep(0.1)
+        p.send_now(gcode_send_Xt)
+        p.pause()
+        p.resume()
+        p.disconnect()
+    #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    # Bottom button controller 
+    def Y_axis_neg_bottom(self): 
+        print("-Y: ",-yb_array[0]) # Array control the y neg axis 
+        p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+        #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+        #gcode = gcoder.LightGCode(gcode)
+        # startprint silently exits if not connected yet
+        gcode_send_Xt = "G0 "+"Y-"+str(yb_array[0])
+        while not p.online:
+                time.sleep(0.1)
+        p.send_now("M302 P0") # this will send M105 immediately, ahead of the rest of the print
+        p.send_now("M302 S0")
+        #p.send_now("M106 S190")
+        p.send_now(gcode_send_Xt)
+        p.pause()
+        p.resume()
+        p.disconnect()
+    def Y_axis_pos_bottom(self):
+        print("Y: ",yb_array[0]) # Array control the y neg axis 
+        p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+        #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+        #gcode = gcoder.LightGCode(gcode)
+        # startprint silently exits if not connected yet
+        gcode_send_Xt = "G0 "+"Y"+str(yb_array[0])
+        while not p.online:
+                time.sleep(0.1)
+        p.send_now("M302 P0") # this will send M105 immediately, ahead of the rest of the print
+        p.send_now("M302 S0")
+        #p.send_now("M106 S190")
+        p.send_now(gcode_send_Xt)
+        p.pause()
+        p.resume()
+        p.disconnect()
+    def X_axis_pos_bottom(self):
+        print("X: ",-xb_array[0]) # Array control the y neg axis 
+        p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+        #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+        #gcode = gcoder.LightGCode(gcode)
+        # startprint silently exits if not connected yet
+        gcode_send_Xt = "G0 "+"X"+str(yb_array[0])
+        while not p.online:
+                time.sleep(0.1)
+        p.send_now("M302 P0") # this will send M105 immediately, ahead of the rest of the print
+        p.send_now("M302 S0")
+        #p.send_now("M106 S190")
+        p.send_now(gcode_send_Xt)
+        p.pause()
+        p.resume()
+        p.disconnect()
+    def X_axis_neg_bottom(self):
+        print("-X: ",-xb_array[0]) # Array control the y neg axis 
+        p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+        #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+        #gcode = gcoder.LightGCode(gcode)
+        # startprint silently exits if not connected yet
+        gcode_send_Xt = "G0 "+"X-"+str(xb_array[0])
+        while not p.online:
+                time.sleep(0.1)
+        p.send_now("M302 P0") # this will send M105 immediately, ahead of the rest of the print
+        p.send_now("M302 S0")
+        #p.send_now("M106 S190")
+        p.send_now(gcode_send_Xt)
+        p.pause()
+        p.resume()
+        p.disconnect()
 
     #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                #Running the function of the value 
@@ -531,7 +727,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lcd3 = self.findChild(QLCDNumber,"lcdNumber_3")
         self.lcd3.display(self.slider_xt.value()) #Getting the top slider of X axis
         self.lcd3.setStyleSheet("""QLCDNumber { background-color: black; }""")
- 
+        Gcode_Xt_motion(xt_array)
     def Top_yt(self):
         print("top_yt: ",self.slider_yt.value())   
         if len(yt_array) >1:
@@ -541,7 +737,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lcd4 = self.findChild(QLCDNumber,"lcdNumber_4")
         self.lcd4.display(self.slider_yt.value()) #Getting the top slider of Y axis
         self.lcd4.setStyleSheet("""QLCDNumber { background-color: black; }""")
- 
+        Gcode_Yt_motion(yt_array) 
+
     def Bottom_xb(self):
         print("bottom_xb: ",self.slider_xb.value())   
         if len(xb_array) >1:
@@ -551,7 +748,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lcd7 = self.findChild(QLCDNumber,"lcdNumber_7")
         self.lcd7.display(self.slider_xb.value()) #Getting bottom slider of X axis
         self.lcd7.setStyleSheet("""QLCDNumber { background-color: black; }""")
- 
+        Gcode_Xb_motion(xb_array)
     def Bottom_yb(self):
         print("bottom_yb: ",self.slider_yb.value())   
         if len(yb_array) >1:
@@ -561,8 +758,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lcd8 = self.findChild(QLCDNumber,"lcdNumber_8") 
         self.lcd8.display(self.slider_yb.value()) #Getting bottom slider of Y axis 
         self.lcd8.setStyleSheet("""QLCDNumber { background-color: black; }""")
-
-    def Serialfunc(self,text): #Getting the text from the list file of the serial
+        Gcode_Yb_motion(yb_array)
+    def Serialfunc(self,text,): #Getting the text from the list file of the serial
         for i in range(0,1): 
               for i in range(0,len(seriallist)):
                
@@ -574,12 +771,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
                             serialmem1.append(str(seriallist[i])) 
               print("serial_selected",text)
+                
+              if Devices_mem == []:
+                    print("Mem serial port",str(text)) 
+                    Devices_mem.append(text)
+              if len(Devices_mem) > 1:
+                       Devices_mem.remove(Devices_mem [0])  #remove the first one out from the list to get only the latest list 
               try:
                 if text != "Non-serial":
                      pnp_serial = printcore('/dev/'+str(text),115200) #fixed baudrate  using the serial communication to control the gcode core motion 
                      while not pnp_serial.online:
                                time.sleep(0.1)  
-
                 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                 #Do process processing here for the G-code command running the fully autonomouse code on the robot 
                 
@@ -634,13 +836,100 @@ class MainWindow(QtWidgets.QMainWindow):
             self.camera2.setPixmap(self.pixmap)        
     def ImageUpdateSlot2(self, Image):
             self.pixmap = QPixmap.fromImage(Image)
-            self.camera3.setPixmap(self.pixmap)        
-    #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    
+            self.camera3.setPixmap(self.pixmap)
+    def Pausemotion(self):
+             print("Pause stepper motor")
+             try:
+              print(Devices_mem[0])
+              if Devices_mem[0] != "Non-serial": 
+                p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+                #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+                #gcode = gcoder.LightGCode(gcode)
+                # startprint silently exits if not connected yet
+                while not p.online:
+                     time.sleep(0.1)
+                p.pause() # Pause the stepper motor
+                p.resume()
+                p.disconnect() 
+             except:
+                 print("Serial device not found")
+    def Resumemotion(self):
+             print("Resume stepper motor")
+             try:
+              print(Devices_mem[0])
+              if Devices_mem[0] != "Non-serial": 
+                p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
+                #gcode=[i.strip() for i in open('filename.gcode')] # or pass in your own array of gcode lines instead of reading from a file
+                #gcode = gcoder.LightGCode(gcode)
+                # startprint silently exits if not connected yet
+                while not p.online:
+                     time.sleep(0.1)
+                p.resume() # Pause the stepper motor
+                p.disconnect() 
+             except:
+                 print("Serial device not found") 
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#Motion control function     
 
-def Gcodecontrollermotion(Xt,Yt,Xb,Yb): #Getting the motion control function for the catesian robot 
-        print(Xt,Yt,Xb,Yb) #Getting the value from each axis input from each catesian robot 
+def Gcode_Xt_motion(Xt): #Getting the motion control function for the catesian robot 
+        print(Xt) #Getting the value from each axis input from each catesian robot 
+        print("G0 "+"X"+str(Xt[0]))
         
+def Gcode_Yt_motion(Yt): #Getting the motion control function for the catesian robot 
+        print(Yt) #Getting the value from each axis input from each catesian robot 
+        print("G0 "+"E0"+str(Yt[0]))
+        
+def Gcode_Xb_motion(Xb): #Getting the motion control function for the catesian robot 
+        print(Xb) #Getting the value from each axis input from each catesian robot 
+        print("G0 "+"X"+str(Xb[0]))
+        
+def Gcode_Yb_motion(Yb): #Getting the motion control function for the catesian robot 
+        print(Yb) #Getting the value from each axis input from each catesian robot 
+        print("G0 "+"Y"+str(Yb[0]))
+        
+def WS2812_controller(spi,mode,nLED,intensity): # Getting the data int the function to control the light intensity and mode 
+      mode_list = ['loop','wave','npimage'] # Getting the mode list to control the function here 
+      if mode in mode_list: 
+            if mode == 'loop':
+                 print("Activate the loop mode") 
+                 stepTime=0.1
+                 iStep=0
+                 while True:
+                          d=[[0,0,0]]*nLED
+                          d[iStep%nLED]=[intensity]*3
+                          #ws2812.write2812(spi, d)
+                          iStep=(iStep+1)%nLED
+                          time.sleep(stepTime)
+            if mode == 'wave':
+                 print("Activate the wave mode for hyper spectral imaging")
+                 tStart=time.time()
+                 indices=4*numpy.array(range(nLED), dtype=numpy.uint32)*numpy.pi/nLED
+                 period0=2
+                 period1=2.1
+                 period2=2.2
+                 try:
+                     while True:
+                          t=tStart-time.time()
+                          #t=1.1
+                          f=numpy.zeros((nLED,3))
+                          f[:,0]=sin(2*pi*t/period0+indices)
+                          f[:,1]=sin(2*pi*t/period1+indices)
+                          f[:,2]=sin(2*pi*t/period2+indices)
+                          f=(intensity)*((f+1.0)/2.0)
+                          fi=numpy.array(f, dtype=numpy.uint8)
+                          #print fi[0]
+                          #time_write2812(spi, fi)
+                          #ws2812.write2812(spi, fi)
+                          time.sleep(0.01)
+                 except KeyboardInterrupt:
+                        print("Error communicating with the RGB data control")
+                       #test_off(spi, nLED)
+            if mode == 'npimage':
+                 print("Numpy image running the loop of the led function")
+def test_off(spi, nLED):
+    print("Print fail safe")
+    #ws2812.write2812(spi, [0,0,0]*nLED)
+
 class Worker1(QThread):
     ImageUpdate = pyqtSignal(QImage)
     def run(self):
@@ -681,8 +970,21 @@ class Worker2(QThread):
                      tb_index = len(dict_complete_query.get(int(Tube_index_number)))
                      for code in range(1,tb_index):
                                print(listPatients_code[code],dict_patients_query.get(listPatients_code[code])) #Extracted patients name
-                               
-                                           
+                               if dict_patients_query.get(listPatients_code[code]) not in  Groupping_Patient: 
+                                                     Groupping_Patient.append(dict_patients_query.get(listPatients_code[code]))
+                               if dict_patients_query.get(listPatients_code[code]) in Groupping_Patient: 
+                                                print("The Patient data all contained in ",Tube_index_number)
+                               print(Groupping_Patient)
+                               if len(Ref_group) >1:
+                                       Ref_group.remove(Ref_group[0]) # Remove the first data from the list 
+                               if Ref_group !=[]:
+                                       Ref_group.append(Groupping_Patient) # Append the data in list to be easier to delete         
+                               print(Ref_group)
+                               #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+                             
+                                            
+                               #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
                      #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                      
             except:
