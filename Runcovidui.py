@@ -109,15 +109,15 @@ Index_patients = []
 dictpatientcsv = {}
 dict_patients_query = {} # Getting the data of the patient query from the tube index code 
 Patients_mem = []
-Groupping_Patient = [] # Grouping the patient data 
+Groupping_Patient = [[],[],[],[],[],[],[],[]] # Grouping the patient data 
 Ref_group = [] # Reference group for the data of the patient 
 Patient_qr_member = {} # Getting the member of the patient on the qr code detection 
-
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
    #Getting the data from the covid detector status 
 Refferrence_len_array = [] # Ref array len to store the status of
 Covid_ref_status = [] # Getting the covid status 
 Covid_tubeindex_liststatus = {} # Getting the tube index status containing x,y position of the covid detection  
+
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 try: 
    print("Creating the tubeindex and patient directory")
@@ -960,7 +960,7 @@ class Worker2(QThread):
                 if len(Qr_listdata) > 1:
                      Qr_listdata.remove(Qr_listdata[0]) # remove the list if inside the list data has more than 1
                      print("Qr_code_Data: ",Qr_listdata[len(Qr_listdata)-1]) # Getting the data from the list here to processing data of patient loop processing 
-                     
+                     patient_mem_list = []
                      #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                      # Processing the patient data here query the data from the tube index code 
                      print(Qr_listdata[0],type(Qr_listdata[0]),Qr_listdata[0].split(",")[1])
@@ -968,23 +968,29 @@ class Worker2(QThread):
                      print(dict_complete_query.get(int(Tube_index_number)))
                      listPatients_code = dict_complete_query.get(int(Tube_index_number))
                      tb_index = len(dict_complete_query.get(int(Tube_index_number)))
+                     
                      for code in range(1,tb_index):
-                               print(listPatients_code[code],dict_patients_query.get(listPatients_code[code])) #Extracted patients name
-                               if dict_patients_query.get(listPatients_code[code]) not in  Groupping_Patient: 
-                                                     Groupping_Patient.append(dict_patients_query.get(listPatients_code[code]))
-                               if dict_patients_query.get(listPatients_code[code]) in Groupping_Patient: 
-                                                print("The Patient data all contained in ",Tube_index_number)
-                               print(Groupping_Patient)
-                               if len(Ref_group) >1:
-                                       Ref_group.remove(Ref_group[0]) # Remove the first data from the list 
-                               if Ref_group !=[]:
-                                       Ref_group.append(Groupping_Patient) # Append the data in list to be easier to delete         
-                               print(Ref_group)
-                               #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-                             
-                                            
-                               #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
+                                print(tb_index,listPatients_code[code],dict_patients_query.get(listPatients_code[code])) #Extracted patients name
+                            
+                                if Tube_index_number not in list(Patient_qr_member):
+                                             patient_mem_list.append(Ref_group) # Getting the patient mem list data 
+                                
+                                if Patient_qr_member !={}:
+                                     
+                                    if Tube_index_number != list(Patient_qr_member)[len(list(Patient_qr_member))-1]:
+                                                    Ref_group.clear()
+                                if dict_patients_query.get(listPatients_code[code]) not in  Ref_group: 
+                                                     Ref_group.append(dict_patients_query.get(listPatients_code[code]))
+                                                     Groupping_Patient[0].append(Ref_group)
+                                                     Patient_qr_member[Tube_index_number] = Groupping_Patient[0]
+                                if dict_patients_query.get(listPatients_code[code]) in Ref_group:  
+                                               print("The Patient data all contained in ",Tube_index_number)
+                                               
+                                print(Ref_group)
+                                print(list(Patient_qr_member))
+                                print(patient_mem_list,len(patient_mem_list))             
+                                #print(Patient_qr_member,len(list(Patient_qr_member)),len(Groupping_Patient[0])) 
+                                
                      #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                      
             except:
