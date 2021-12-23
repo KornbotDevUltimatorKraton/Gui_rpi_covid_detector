@@ -43,7 +43,6 @@ xb_array = []
 yb_array = []
 Devices_mem = [] # Devices mem the serial device
 #Calibration interval from the auto calibration 
-Qr_interval = [] 
 Covid_interval = []
 #referent covid status
 Covid_status = [] #current covid19 status on the testtube detected on each position and colllect into the json data created on the list 
@@ -52,7 +51,6 @@ serialmem1 = []
 
 Patientpersonaldata = ['index no.','patient name','age'] #Getting the patients personal data as the key for the system 
 Patientdata = {} #Getting the json file generated for the qrcode generator 
-index_number = [] #Getting the index number of the patient 
 name_patient =[]  #Getting the name of the patient 
 age_patient = []  #Getting the age of the patient 
 username = getpass.getuser() #Getting the host of the user 
@@ -112,6 +110,7 @@ Patients_mem = []
 Groupping_Patient = [[],[],[],[],[],[],[],[]] # Grouping the patient data 
 Ref_group = [] # Reference group for the data of the patient 
 Patient_qr_member = {} # Getting the member of the patient on the qr code detection 
+patient_mem_list = []
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
    #Getting the data from the covid detector status 
 Refferrence_len_array = [] # Ref array len to store the status of
@@ -475,13 +474,16 @@ class MainWindow(QtWidgets.QMainWindow):
                             dictpatientcsv[Header_patients[r]] = Patients_mem[r]
                     #print(dictcsv)
                     for rew in list(dictpatientcsv):
-                           print(rew,dictpatientcsv.get(rew))
+                           print("Patients data: ",rew,dictpatientcsv.get(rew))
                     for wed in range(0,len(list(dictpatientcsv))):
                            Index_patients.append(list(dictpatientcsv.values())[wed][0])
                     for head in range(0,len(Index_patients)):
                               dict_patients_query[Index_patients[head]]  = list(dictpatientcsv.values())[head]
 
-                    print(dict_patients_query)
+                    print("Patient list data: ",dict_patients_query)
+                    print(Patients_mem)
+                             
+                                   
                except: 
                    print("No file input from combo box")   
           except:
@@ -525,9 +527,11 @@ class MainWindow(QtWidgets.QMainWindow):
                            Index_tuber.append(list(dictcsv.values())[wed][0])
                     try:
                         for head in range(0,len(Index_tuber)):
+                              print(list(dictcsv.values())[head],head)
                               dict_complete_query[Index_tuber[head]]  = list(dictcsv.values())[head]
-
+                              
                         print(dict_complete_query)
+
                     except: 
                          print("Out of range")
                 except: 
@@ -605,7 +609,7 @@ class MainWindow(QtWidgets.QMainWindow):
         p.pause()
         p.resume()
         p.disconnect()
-    
+        
     def Y_axis_pos_top(self):
         print("+Y: ",yt_array[0])  # Array control the y pos axis 
         p=printcore('/dev/'+str(Devices_mem[0]), 115200) # or p.printcore('COM3',115200) on Windows
@@ -960,7 +964,6 @@ class Worker2(QThread):
                 if len(Qr_listdata) > 1:
                      Qr_listdata.remove(Qr_listdata[0]) # remove the list if inside the list data has more than 1
                      print("Qr_code_Data: ",Qr_listdata[len(Qr_listdata)-1]) # Getting the data from the list here to processing data of patient loop processing 
-                     patient_mem_list = []
                      #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                      # Processing the patient data here query the data from the tube index code 
                      print(Qr_listdata[0],type(Qr_listdata[0]),Qr_listdata[0].split(",")[1])
@@ -968,21 +971,24 @@ class Worker2(QThread):
                      print(dict_complete_query.get(int(Tube_index_number)))
                      listPatients_code = dict_complete_query.get(int(Tube_index_number))
                      tb_index = len(dict_complete_query.get(int(Tube_index_number)))
-                     
+                     print(dict_complete_query)
                      for code in range(1,tb_index):
                                 print(tb_index,listPatients_code[code],dict_patients_query.get(listPatients_code[code])) #Extracted patients name
-                            
+
+                                """
                                 if Tube_index_number not in list(Patient_qr_member):
-                                             patient_mem_list.append(Ref_group) # Getting the patient mem list data 
+                                             patient_mem_list.append([Ref_group]) # Getting the patient mem list data 
                                 
                                 if Patient_qr_member !={}:
                                      
                                     if Tube_index_number != list(Patient_qr_member)[len(list(Patient_qr_member))-1]:
                                                     Ref_group.clear()
+
                                 if dict_patients_query.get(listPatients_code[code]) not in  Ref_group: 
                                                      Ref_group.append(dict_patients_query.get(listPatients_code[code]))
                                                      Groupping_Patient[0].append(Ref_group)
                                                      Patient_qr_member[Tube_index_number] = Groupping_Patient[0]
+                                
                                 if dict_patients_query.get(listPatients_code[code]) in Ref_group:  
                                                print("The Patient data all contained in ",Tube_index_number)
                                                
@@ -990,7 +996,7 @@ class Worker2(QThread):
                                 print(list(Patient_qr_member))
                                 print(patient_mem_list,len(patient_mem_list))             
                                 #print(Patient_qr_member,len(list(Patient_qr_member)),len(Groupping_Patient[0])) 
-                                
+                                """
                      #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                      
             except:
